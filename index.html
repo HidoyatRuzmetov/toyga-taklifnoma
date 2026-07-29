@@ -295,6 +295,27 @@ html.js .cover{
 }
 .toast.on{transform:translate(-50%,0)}
 
+/* ---------- MUSIC CONTROL ---------- */
+.music{
+  position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:110;
+  width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+  color:var(--paper);background:rgba(15,46,51,.92);border:1px solid rgba(194,154,78,.72);
+  box-shadow:0 12px 34px rgba(15,46,51,.2);backdrop-filter:blur(12px);
+  opacity:0;pointer-events:none;transform:translateY(16px) scale(.9);
+  transition:opacity .65s var(--e),transform .65s var(--e),background .35s ease,border-color .35s ease;
+}
+body.invite-open .music{opacity:1;pointer-events:auto;transform:none}
+.music:hover,.music:focus-visible{background:var(--turq);border-color:var(--turq)}
+.music:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
+.music__bars{width:19px;height:17px;display:flex;align-items:center;justify-content:center;gap:2.5px}
+.music__bars i{display:block;width:2px;height:5px;border-radius:2px;background:currentColor;transform-origin:center}
+.music.on .music__bars i{animation:musicBar .8s ease-in-out infinite alternate}
+.music.on .music__bars i:nth-child(2){animation-delay:-.55s}
+.music.on .music__bars i:nth-child(3){animation-delay:-.25s}
+.music.on .music__bars i:nth-child(4){animation-delay:-.68s}
+.music:not(.on) .music__bars i{height:2px;opacity:.72}
+.music__txt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@keyframes musicBar{0%{transform:scaleY(.45)}100%{transform:scaleY(2.7)}}
 
 /* ---------- POLISHED MOTION SYSTEM ---------- */
 html.js .cover{background:transparent;overflow:hidden;transform:none;transition:visibility 0s linear 1.45s}
@@ -358,6 +379,7 @@ html.js .cover::after{right:0;transform-origin:right}
   html{scroll-behavior:auto}
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.16s!important}
   .ml>i,.up{opacity:1;transform:none}
+  .music.on .music__bars i{animation:none;height:8px}
   .mark i,.hero__hr{transform:scaleX(1)}
   .hero__rose *{stroke-dashoffset:0}
   .cue,.cover__eye,.open,.cover__guest,.cover__rose{opacity:1}
@@ -463,7 +485,7 @@ html.js .cover::after{right:0;transform-origin:right}
     </h2>
 
     <div class="up" data-d="3" style="margin-top:36px">
-      <p class="tx">Farzandimiz <b>Akrombek</b>ning nikoh to‘yi munosabati bilan yozilajak dasturxonimizga sizni lutfan taklif etamiz.</p>
+      <p class="tx">Farzandlarimiz <b>Akrombek va Gulhayo</b>ning nikoh to‘yi munosabati bilan bo‘lib o‘tadigan to‘y dasturxonimizga Sizni chin dildan taklif etamiz.</p>
       <p class="tx">Shu qutlug‘ kunda bir davrada jam bo‘lib, duoyi fotihangizni olish biz uchun ulkan baxt.</p>
       <p class="tx">To‘y oqshomi <b>19-avgust</b> kuni soat <b>19:00</b> da Yusufbobojon to‘yxonasida bo‘lib o‘tadi.</p>
       <p class="tx">Tashrifingiz davramizga fayz bag‘ishlaydi.</p>
@@ -545,6 +567,11 @@ html.js .cover::after{right:0;transform-origin:right}
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<button class="music" id="musicBtn" type="button" aria-label="Musiqani o‘chirish" aria-pressed="true" title="Musiqa">
+  <span class="music__bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+  <span class="music__txt">Musiqa</span>
+</button>
+
 <script>
 (function(){
   'use strict';
@@ -580,6 +607,98 @@ html.js .cover::after{right:0;transform-origin:right}
     clearTimeout(tT); tT=setTimeout(function(){toastEl.classList.remove('on');},2800);
   }
 
+  /* original ambient instrumental — generated locally with Web Audio */
+  var musicBtn=d.getElementById('musicBtn'), audioCtx=null, master=null, musicTimer=null, musicCloseTimer=null,
+      musicOn=true, musicStarted=false, nextPhrase=0;
+  var AC=W.AudioContext||W.webkitAudioContext;
+
+  function noteFreq(n){ return 440*Math.pow(2,(n-69)/12); }
+  function pluck(midi,at,dur,level,pan){
+    if(!audioCtx||!master) return;
+    var osc=audioCtx.createOscillator(), overtone=audioCtx.createOscillator();
+    var g=audioCtx.createGain(), g2=audioCtx.createGain(), filter=audioCtx.createBiquadFilter();
+    var panner=audioCtx.createStereoPanner?audioCtx.createStereoPanner():null;
+    osc.type='sine'; overtone.type='triangle';
+    osc.frequency.setValueAtTime(noteFreq(midi),at);
+    overtone.frequency.setValueAtTime(noteFreq(midi+12),at);
+    filter.type='lowpass'; filter.frequency.setValueAtTime(2600,at);
+    filter.frequency.exponentialRampToValueAtTime(900,at+dur);
+    g.gain.setValueAtTime(.0001,at); g.gain.exponentialRampToValueAtTime(level,at+.025);
+    g.gain.exponentialRampToValueAtTime(.0001,at+dur);
+    g2.gain.setValueAtTime(.0001,at); g2.gain.exponentialRampToValueAtTime(level*.16,at+.018);
+    g2.gain.exponentialRampToValueAtTime(.0001,at+dur*.7);
+    osc.connect(g); overtone.connect(g2); g.connect(filter); g2.connect(filter);
+    if(panner){ panner.pan.setValueAtTime(pan||0,at); filter.connect(panner); panner.connect(master); }
+    else filter.connect(master);
+    osc.start(at); overtone.start(at); osc.stop(at+dur+.08); overtone.stop(at+dur+.08);
+  }
+  function pad(notes,at,dur){
+    if(!audioCtx||!master) return;
+    notes.forEach(function(midi,idx){
+      var osc=audioCtx.createOscillator(), g=audioCtx.createGain(), filter=audioCtx.createBiquadFilter();
+      osc.type=idx===0?'sine':'triangle'; osc.frequency.setValueAtTime(noteFreq(midi),at);
+      filter.type='lowpass'; filter.frequency.setValueAtTime(560,at);
+      g.gain.setValueAtTime(.0001,at); g.gain.exponentialRampToValueAtTime(idx===0?.014:.008,at+1.2);
+      g.gain.setValueAtTime(idx===0?.014:.008,at+dur-1.5); g.gain.exponentialRampToValueAtTime(.0001,at+dur);
+      osc.connect(filter); filter.connect(g); g.connect(master); osc.start(at); osc.stop(at+dur+.1);
+    });
+  }
+  function schedulePhrase(at){
+    var chords=[[53,57,60],[48,52,55],[50,53,57],[46,50,53]]; // F, C, Dm, Bb
+    var pattern=[0,1,2,1,0,1,2,1], step=.58, chordDur=step*8;
+    chords.forEach(function(chord,c){
+      var start=at+c*chordDur;
+      pad([chord[0]-12,chord[1],chord[2]],start,chordDur+.3);
+      pattern.forEach(function(ix,j){
+        var lift=(j===6?12:0);
+        pluck(chord[ix]+lift,start+j*step,1.65,j%4===0?.046:.034,(j%2?-.16:.16));
+      });
+    });
+    return chordDur*chords.length;
+  }
+  function queueMusic(){
+    if(!musicOn||!audioCtx) return;
+    var now=audioCtx.currentTime;
+    if(nextPhrase<now+.6) nextPhrase=now+.08;
+    var len=schedulePhrase(nextPhrase);
+    nextPhrase+=len;
+    musicTimer=setTimeout(queueMusic,Math.max(1000,(nextPhrase-audioCtx.currentTime-1.2)*1000));
+  }
+  function startMusic(){
+    clearTimeout(musicCloseTimer);
+    if(!AC){ if(musicBtn) musicBtn.hidden=true; return; }
+    if(!audioCtx){
+      audioCtx=new AC(); master=audioCtx.createGain();
+      master.gain.setValueAtTime(.0001,audioCtx.currentTime);
+      master.connect(audioCtx.destination);
+    }
+    audioCtx.resume().then(function(){
+      musicOn=true; musicStarted=true; clearTimeout(musicTimer); nextPhrase=audioCtx.currentTime+.06;
+      master.gain.cancelScheduledValues(audioCtx.currentTime);
+      master.gain.setValueAtTime(Math.max(.0001,master.gain.value),audioCtx.currentTime);
+      master.gain.exponentialRampToValueAtTime(.72,audioCtx.currentTime+.9);
+      musicBtn.classList.add('on'); musicBtn.setAttribute('aria-pressed','true');
+      musicBtn.setAttribute('aria-label','Musiqani o‘chirish'); queueMusic();
+    }).catch(function(){ musicBtn.classList.remove('on'); });
+  }
+  function stopMusic(){
+    musicOn=false; musicStarted=false; clearTimeout(musicTimer); clearTimeout(musicCloseTimer);
+    if(audioCtx&&master){
+      master.gain.cancelScheduledValues(audioCtx.currentTime);
+      master.gain.setValueAtTime(Math.max(.0001,master.gain.value),audioCtx.currentTime);
+      master.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.45);
+    }
+    musicBtn.classList.remove('on'); musicBtn.setAttribute('aria-pressed','false');
+    musicBtn.setAttribute('aria-label','Musiqani yoqish');
+    musicCloseTimer=setTimeout(function(){
+      if(!musicOn&&audioCtx){ audioCtx.close(); audioCtx=null; master=null; nextPhrase=0; }
+    },520);
+  }
+  musicBtn.addEventListener('click',function(){
+    if(!musicStarted||!musicOn){ startMusic(); toast('Musiqa yoqildi'); }
+    else{ stopMusic(); toast('Musiqa o‘chirildi'); }
+  });
+
   /* cover */
   var cover=d.getElementById('cover'), hero=d.getElementById('hero');
   d.body.classList.add('lock');
@@ -587,6 +706,8 @@ html.js .cover::after{right:0;transform-origin:right}
     if(cover.classList.contains('out')) return;
     cover.classList.add('out');
     hero.classList.add('go');
+    d.body.classList.add('invite-open');
+    startMusic();
     setTimeout(function(){
       cover.classList.add('gone');
       d.body.classList.remove('lock');
